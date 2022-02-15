@@ -165,7 +165,7 @@ def upload_sftp_file(
         return
 
     try:
-        client.put(source_full_path, destination_full_path)
+        client.put(source_full_path, destination_full_path,confirm=False)
     except Exception as e:
         print(f'Failed to upload {source_full_path} to SFTP server')
         raise(e)
