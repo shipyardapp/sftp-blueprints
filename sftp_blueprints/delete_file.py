@@ -4,9 +4,15 @@ import re
 import json
 import tempfile
 import argparse
+import sys
 import shipyard_utils as shipyard
 import paramiko
 
+
+EXIT_CODE_INCORRECT_CREDENTIALS = 3
+EXIT_CODE_NO_MATCHES_FOUND = 200
+EXIT_CODE_INVALID_FILE_PATH = 201
+EXIT_CODE_SFTP_DELETE_ERROR = 202
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -57,7 +63,7 @@ def find_sftp_file_names(client, prefix=''):
             files.extend(find_sftp_file_names(client, folder))
     except Exception as e:
         print(f'Failed to find files in folder {prefix}')
-        raise(e)
+        sys.exit(EXIT_CODE_NO_MATCHES_FOUND)
 
     return files
 
@@ -70,7 +76,7 @@ def delete_sftp_file(client, file_path):
         client.remove(file_path)
     except Exception as e:
         print(f'Failed to delete {file_path}: {e}')
-
+        sys.exit(EXIT_CODE_SFTP_DELETE_ERROR)
     print(f'{file_path} successfully deleted')
 
 
@@ -94,7 +100,7 @@ def get_client(host, port, username, key=None, password=None):
     except Exception as e:
         print(f'Error accessing the SFTP server with the specified credentials' \
                 f' {host}:{port} {username}:{key}')
-        raise(e)
+        sys.exit(EXIT_CODE_INCORRECT_CREDENTIALS)
 
 
 def main():
@@ -132,6 +138,9 @@ def main():
         files = find_sftp_file_names(client=client, prefix=source_folder_name)
         matching_file_names = shipyard.files.find_all_file_matches(files,
                                             re.compile(source_file_name))
+        if len(matching_file_names) == 0:
+            print("No matches found")
+            sys.exit(EXIT_CODE_NO_MATCHES_FOUND)
         print(f'{len(matching_file_names)} files found. Preparing to delete...')
 
         for index, file_name in enumerate(matching_file_names):
