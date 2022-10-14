@@ -20,7 +20,8 @@ def get_args():
             choices={
                 'exact_match',
                 'regex_match'},
-            required=True)
+            default = 'exact_match',
+            required=False)
     parser.add_argument('--source-file-name', dest='source_file_name',
             required=True)
     parser.add_argument('--source-folder-name', dest='source_folder_name',

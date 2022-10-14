@@ -16,7 +16,7 @@ except BaseException:
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--source-file-name-match-type', dest='source_file_name_match_type',
-                        choices={'exact_match', 'regex_match'}, required=True)
+                        choices={'exact_match', 'regex_match'},default = 'exact_match',required=False)
     parser.add_argument('--source-folder-name',
                         dest='source_folder_name', default='', required=False)
     parser.add_argument('--source-file-name',
