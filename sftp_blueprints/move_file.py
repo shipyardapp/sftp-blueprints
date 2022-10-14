@@ -7,11 +7,11 @@ import glob
 import sys
 import shipyard_utils as shipyard
 import paramiko
+try:
+    import exit_codes as ec
+except BaseException:
+    from . import exit_codes as ec
 
-EXIT_CODE_INCORRECT_CREDENTIALS = 3
-EXIT_CODE_NO_MATCHES_FOUND = 200
-EXIT_CODE_INVALID_FILE_PATH = 201
-EXIT_CODE_SFTP_MOVE_ERROR = 202
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -99,13 +99,13 @@ def move_sftp_file(
     try:
         client.stat(source_full_path)
     except FileNotFoundError:
-        sys.exit(EXIT_CODE_INVALID_FILE_PATH)
+        sys.exit(ec.EXIT_CODE_INVALID_FILE_PATH)
     # move file
     try:
         client.rename(source_full_path, destination_full_path)
     except Exception:
         print(f'Failed to move {source_full_path} to {destination_full_path}')
-        sys.exit(EXIT_CODE_SFTP_MOVE_ERROR)
+        sys.exit(ec.EXIT_CODE_SFTP_MOVE_ERROR)
     
     print(f'{source_full_path} successfully moved to ' \
             f'{destination_full_path}')
@@ -131,7 +131,7 @@ def get_client(host, port, username, key=None, password=None):
     except Exception as e:
         print(f'Error accessing the SFTP server with the specified credentials' \
                 f' {host}:{port} {username}:{key}')
-        sys.exit(EXIT_CODE_INCORRECT_CREDENTIALS)
+        sys.exit(ec.EXIT_CODE_INCORRECT_CREDENTIALS)
 
 
 def main():

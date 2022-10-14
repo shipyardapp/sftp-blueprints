@@ -1,1 +1,2 @@
 paramiko==2.7.2
+shipyard-utils==0.1.4
