@@ -118,7 +118,7 @@ def get_client(host, port, username, key=None, password=None):
     specified credentials
     """
     try:
-        if key:
+        if key is not None:
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             k = paramiko.RSAKey.from_private_key_file(key)

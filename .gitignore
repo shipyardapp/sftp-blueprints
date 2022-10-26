@@ -131,3 +131,4 @@ dmypy.json
 # local testing
 test.sh
 upload_soccer.py
+.vscode
