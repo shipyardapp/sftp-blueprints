@@ -142,10 +142,10 @@ def main():
             sys.exit(ec.EXIT_CODE_NO_MATCHES_FOUND)
         print(f'{len(matching_file_names)} files found. Preparing to delete...')
 
-        for index, file_name in enumerate(matching_file_names):
+        for index, file_name in enumerate(matching_file_names,1):
             delete_file_path = file_name
 
-            print(f'deleting file {index+1} of {len(matching_file_names)}')
+            print(f'deleting file {index} of {len(matching_file_names)}')
             try:
                 delete_sftp_file(client,delete_file_path)
             except Exception as e:

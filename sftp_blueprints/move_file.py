@@ -88,6 +88,14 @@ def cd_into_cwd(client, destination_path):
             client.mkdir(folder)
             client.chdir(folder)
 
+def folder_exists(client, folder):
+    """
+    Helper function to see if a directory exists in the sftp server
+    """
+    if folder not in client.listdir():
+        return False
+    return True
+
 
 def move_sftp_file(
         client,
@@ -168,6 +176,11 @@ def main():
     destination_folder_name = shipyard.files.clean_folder_name(args.destination_folder_name)
     source_file_name_match_type = args.source_file_name_match_type
 
+    ## check to see if the destination folder exists, if not a directory will be created
+    if destination_folder_name:
+        if not folder_exists(client,destination_folder_name):
+            client.mkdir(destination_folder_name)
+
 
     if source_file_name_match_type == 'regex_match':
         file_names = find_sftp_file_names(client, prefix=source_folder_name)
@@ -175,32 +188,21 @@ def main():
             file_names, re.compile(source_file_name))
         print(f'{len(matching_file_names)} files found. Preparing to move...')
 
-        cwd_set = False
-        for index, key_name in enumerate(matching_file_names):
+        for index, key_name in enumerate(matching_file_names, 1):
             destination_full_path = shipyard.files.determine_destination_full_path(
                             destination_folder_name=destination_folder_name,
                             destination_file_name=args.destination_file_name,
-                            source_full_path=key_name, file_number=index + 1)
-            if not cwd_set and destination_folder_name != '':
-                path, _ = destination_full_path.rsplit('/', 1)
-                cd_into_cwd(client=client, destination_path=path)
-                cwd_set = True
+                            source_full_path=key_name,
+                            file_number= None if len(matching_file_names) == 1 else index)
 
-            file_name = destination_full_path.rsplit('/', 1)[-1]
-            print(f'Moving file {index+1} of {len(matching_file_names)}')
+            print(f'Moving file {index} of {len(matching_file_names)}')
             move_sftp_file(client=client, source_full_path=key_name,
-                            destination_full_path=file_name)
-
+                            destination_full_path=destination_full_path)
     else:
         destination_full_path = shipyard.files.determine_destination_full_path(
                             destination_folder_name=destination_folder_name,
                             destination_file_name=args.destination_file_name,
                             source_full_path=source_full_path)
-
-        if len(destination_full_path.split('/')) > 1:
-            path, destination_full_path = destination_full_path.rsplit('/', 1)
-            cd_into_cwd(client=client, destination_path=path)
-
         move_sftp_file(client=client, source_full_path=source_full_path,
                         destination_full_path=destination_full_path)
 
