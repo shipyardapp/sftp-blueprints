@@ -138,6 +138,7 @@ def get_client(host, port, username, key=None, password=None):
             client = paramiko.SFTPClient.from_transport(transport)
         return client
     except Exception as e:
+        print(e)
         print(f'Error accessing the SFTP server with the specified credentials' \
                 f' {host}:{port} {username}:{key}')
         sys.exit(ec.EXIT_CODE_INCORRECT_CREDENTIALS)
