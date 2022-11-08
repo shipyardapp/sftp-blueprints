@@ -108,6 +108,7 @@ def move_sftp_file(
     try:
         client.stat(source_full_path)
     except FileNotFoundError:
+        print(f"Error: the file {source_full_path} was not not found")
         sys.exit(ec.EXIT_CODE_INVALID_FILE_PATH)
     # move file
     try:
