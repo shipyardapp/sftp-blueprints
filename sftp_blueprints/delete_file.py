@@ -98,7 +98,7 @@ def get_client(host, port, username, key=None, password=None):
         return client
     except Exception as e:
         print(f'Error accessing the SFTP server with the specified credentials' \
-                f' {host}:{port} {username}:{key}')
+                f' {host}:{port} {username}:{key}. Error details: {e}')
         sys.exit(ec.EXIT_CODE_INCORRECT_CREDENTIALS)
 
 
