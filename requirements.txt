@@ -1,0 +1,4 @@
+setuptools~=65.5.1
+# paramiko~=2.11.0
+paramiko-ng==2.8.10
+asyncssh~=2.13.2
