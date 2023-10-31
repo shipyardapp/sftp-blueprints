@@ -1,10 +1,14 @@
-import argparse
 import os
 import re
-import tempfile
+import sys
+
 import asyncio
+import argparse
+import tempfile
 import asyncssh
 import paramiko
+
+from sftp_blueprints.exit_codes import EXIT_CODE_INCORRECT_CREDENTIALS, EXIT_CODE_SFTP_DOWNLOAD_ERROR
 
 
 def get_args():
@@ -55,7 +59,7 @@ def enumerate_destination_file_name(destination_file_name, file_number):
 
 
 def determine_destination_file_name(
-    *, source_full_path, destination_file_name, file_number=None
+        *, source_full_path, destination_file_name, file_number=None
 ):
     """
     Determine if the destination_file_name was provided, or should be extracted from the source_file_name,
@@ -94,7 +98,7 @@ def combine_folder_and_file_name(folder_name, file_name):
 
 
 def determine_destination_name(
-    destination_folder_name, destination_file_name, source_full_path, file_number=None
+        destination_folder_name, destination_file_name, source_full_path, file_number=None
 ):
     """
     Determine the final destination name of the file being downloaded.
@@ -207,7 +211,7 @@ def download_with_paramiko():
     key = args.key
     if not password and not key:
         print("Must specify a password or a RSA key")
-        return
+        sys.exit(EXIT_CODE_INCORRECT_CREDENTIALS)
 
     key_path = None
     if key:
@@ -221,6 +225,7 @@ def download_with_paramiko():
     elif password:
         client = get_client(host=host, port=port, username=username, password=password)
 
+    errors = []
     source_file_name = args.source_file_name
     source_folder_name = clean_folder_name(args.source_folder_name)
     source_full_path = combine_folder_and_file_name(
@@ -245,7 +250,7 @@ def download_with_paramiko():
                 file_number=index + 1,
             )
 
-            print(f"Downloading file {index+1} of {len(matching_file_names)}")
+            print(f"Downloading file {index + 1} of {len(matching_file_names)}")
             try:
                 download_sftp_file(
                     client=client,
@@ -253,23 +258,30 @@ def download_with_paramiko():
                     destination_file_name=destination_name,
                 )
             except Exception as e:
-                print(f"Failed to download {file_name}... Skipping")
+                print(f"Failed to download {file_name} due to {e}... Skipping")
+                errors.append({"filename": file_name, "error": e})
     else:
-        destination_name = determine_destination_name(
-            destination_folder_name=destination_folder_name,
-            destination_file_name=args.destination_file_name,
-            source_full_path=source_full_path,
-        )
+        try:
+            destination_name = determine_destination_name(
+                destination_folder_name=destination_folder_name,
+                destination_file_name=args.destination_file_name,
+                source_full_path=source_full_path,
+            )
 
-        download_sftp_file(
-            client=client,
-            file_name=source_full_path,
-            destination_file_name=destination_name,
-        )
-
+            download_sftp_file(
+                client=client,
+                file_name=source_full_path,
+                destination_file_name=destination_name,
+            )
+        except Exception as e:
+            print(f"Failed to download {source_full_path} due to {e}")
+            errors.append({"filename": source_full_path, "error": e})
     if key_path:
         print(f"Removing temporary RSA Key file {key_path}")
         os.remove(key_path)
+    if errors:
+        print(f"Failed to download {len(errors)} file(s)")
+        sys.exit(EXIT_CODE_SFTP_DOWNLOAD_ERROR)
 
 
 def is_openssh_key(filename):
@@ -279,23 +291,23 @@ def is_openssh_key(filename):
 
 
 async def download_files(
-    hostname,
-    username,
-    client_keys,
-    remote_dir,
-    pattern,
-    local_dir,
-    port=22,
-    match_type="exact_match",
+        hostname,
+        username,
+        client_keys,
+        remote_dir,
+        pattern,
+        local_dir,
+        port=22,
+        match_type="exact_match",
 ):
     try:
         print("Attempting to connect to SFTP server...")
         async with asyncssh.connect(
-            hostname,
-            username=username,
-            client_keys=client_keys,
-            port=port,
-            known_hosts=None,
+                hostname,
+                username=username,
+                client_keys=client_keys,
+                port=port,
+                known_hosts=None,
         ) as conn:
             print("Connected to SFTP server.")
             async with conn.start_sftp_client() as sftp:
@@ -369,17 +381,22 @@ def main():
         download_with_paramiko()
     except paramiko.AuthenticationException as error:
         if (
-            is_openssh_key(os.environ["SFTP_RSA_KEY_FILE"])
-            and os.environ["SFTP_RSA_KEY_FILE"] != ""
+                is_openssh_key(os.environ["SFTP_RSA_KEY_FILE"])
+                and os.environ["SFTP_RSA_KEY_FILE"] != ""
         ):
             print(
                 "Warning: Trouble Authenticating with RSA Key.\n"
-                "We have detected an RSA Key in the OpenSSH format. We will now attempt to connect to the SFTP server using a different method. To avoid this warning in the future, it is recommended to use an RSA PEM key instead."
+                "We have detected an RSA Key in the OpenSSH format. "
+                "We will now attempt to connect to the SFTP server using a different method. "
+                "To avoid this warning in the future, it is recommended to use an RSA PEM key instead."
             )
             asyncio.run(download_with_asycssh())
 
         else:
             raise error
+    except Exception as error:
+        print(f"Error: {error}")
+        sys.exit(EXIT_CODE_SFTP_DOWNLOAD_ERROR)
 
 
 if __name__ == "__main__":
