@@ -1,11 +1,13 @@
-import argparse
 import os
 import re
-import tempfile
+
 import asyncio
+import argparse
+import sys
+import tempfile
 import asyncssh
 import paramiko
-
+import exit_codes
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -221,6 +223,7 @@ def download_with_paramiko():
     elif password:
         client = get_client(host=host, port=port, username=username, password=password)
 
+    errors = []
     source_file_name = args.source_file_name
     source_folder_name = clean_folder_name(args.source_folder_name)
     source_full_path = combine_folder_and_file_name(
@@ -253,25 +256,30 @@ def download_with_paramiko():
                     destination_file_name=destination_name,
                 )
             except Exception as e:
-                print(f"Failed to download {file_name}... Skipping")
+                print(f"Failed to download {file_name} due to {e}... Skipping")
+                errors.append({"filename": file_name, "error": e})
     else:
-        destination_name = determine_destination_name(
-            destination_folder_name=destination_folder_name,
-            destination_file_name=args.destination_file_name,
-            source_full_path=source_full_path,
-        )
+        try:
+            destination_name = determine_destination_name(
+                destination_folder_name=destination_folder_name,
+                destination_file_name=args.destination_file_name,
+                source_full_path=source_full_path,
+            )
 
-        download_sftp_file(
-            client=client,
-            file_name=source_full_path,
-            destination_file_name=destination_name,
-        )
-
+            download_sftp_file(
+                client=client,
+                file_name=source_full_path,
+                destination_file_name=destination_name,
+            )
+        except Exception as e:
+            print(f"Failed to download {source_full_path} due to {e}")
+            errors.append({"filename": source_full_path, "error": e})
     if key_path:
         print(f"Removing temporary RSA Key file {key_path}")
         os.remove(key_path)
-
-
+    if errors:
+        print(f"Failed to download {len(errors)} file(s)")
+        sys.exit(exit_codes.EXIT_CODE_SFTP_DOWNLOAD_ERROR)
 def is_openssh_key(filename):
     with open(filename, "r") as f:
         first_line = f.readline().strip()
@@ -374,12 +382,17 @@ def main():
         ):
             print(
                 "Warning: Trouble Authenticating with RSA Key.\n"
-                "We have detected an RSA Key in the OpenSSH format. We will now attempt to connect to the SFTP server using a different method. To avoid this warning in the future, it is recommended to use an RSA PEM key instead."
+                "We have detected an RSA Key in the OpenSSH format. "
+                "We will now attempt to connect to the SFTP server using a different method. "
+                "To avoid this warning in the future, it is recommended to use an RSA PEM key instead."
             )
             asyncio.run(download_with_asycssh())
 
         else:
             raise error
+    except Exception as error:
+        print(f"Error: {error}")
+        sys.exit(exit_codes.EXIT_CODE_SFTP_DOWNLOAD_ERROR)
 
 
 if __name__ == "__main__":
