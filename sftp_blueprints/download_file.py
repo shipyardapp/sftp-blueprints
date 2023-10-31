@@ -1,13 +1,13 @@
 import os
 import re
+import sys
 
 import asyncio
 import argparse
-import sys
 import tempfile
 import asyncssh
 import paramiko
-import exit_codes
+from exit_codes import EXIT_CODE_INCORRECT_CREDENTIALS, EXIT_CODE_SFTP_DOWNLOAD_ERROR
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -209,7 +209,7 @@ def download_with_paramiko():
     key = args.key
     if not password and not key:
         print("Must specify a password or a RSA key")
-        return
+        sys.exit(EXIT_CODE_INCORRECT_CREDENTIALS)
 
     key_path = None
     if key:
@@ -279,7 +279,7 @@ def download_with_paramiko():
         os.remove(key_path)
     if errors:
         print(f"Failed to download {len(errors)} file(s)")
-        sys.exit(exit_codes.EXIT_CODE_SFTP_DOWNLOAD_ERROR)
+        sys.exit(EXIT_CODE_SFTP_DOWNLOAD_ERROR)
 def is_openssh_key(filename):
     with open(filename, "r") as f:
         first_line = f.readline().strip()
@@ -392,7 +392,7 @@ def main():
             raise error
     except Exception as error:
         print(f"Error: {error}")
-        sys.exit(exit_codes.EXIT_CODE_SFTP_DOWNLOAD_ERROR)
+        sys.exit(EXIT_CODE_SFTP_DOWNLOAD_ERROR)
 
 
 if __name__ == "__main__":
