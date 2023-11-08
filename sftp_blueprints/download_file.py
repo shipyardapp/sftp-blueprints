@@ -259,6 +259,7 @@ def download_with_paramiko():
                 file_number=index + 1,
             )
 
+            print(f"Downloading file {index + 1} of {len(matching_file_names)}")
 
             try:
                 download_sftp_file(
