@@ -1,14 +1,16 @@
 import os
 import re
 import sys
-
+import time
 import asyncio
 import argparse
 import tempfile
 import asyncssh
 import paramiko
 
-from sftp_blueprints.exit_codes import EXIT_CODE_INCORRECT_CREDENTIALS, EXIT_CODE_SFTP_DOWNLOAD_ERROR
+from sftp_blueprints.exit_codes import (EXIT_CODE_INCORRECT_CREDENTIALS,
+                                        EXIT_CODE_SFTP_DOWNLOAD_ERROR,
+                                        EXIT_CODE_NO_MATCHES_FOUND)
 
 
 def get_args():
@@ -193,6 +195,9 @@ def get_client(host, port, username, key=None, password=None):
         else:
             transport = paramiko.Transport((host, int(port)))
             transport.connect(None, username, password)
+            transport.default_window_size = 4294967294
+            transport.packetizer.REKEY_BYTES = pow(2, 40)
+            transport.packetizer.REKEY_PACKETS = pow(2, 40)
             return paramiko.SFTPClient.from_transport(transport)
     except Exception as e:
         print(
@@ -240,7 +245,11 @@ def download_with_paramiko():
     if source_file_name_match_type == "regex_match":
         files = find_sftp_file_names(client=client, prefix=source_folder_name)
         matching_file_names = find_matching_files(files, re.compile(source_file_name))
-        print(f"{len(matching_file_names)} files found. Preparing to download...")
+        if matching_file_names:
+            print(f"{len(matching_file_names)} files found. Preparing to download...")
+        else:
+            print(f"No files found matching {source_file_name}")
+            sys.exit(EXIT_CODE_NO_MATCHES_FOUND)
 
         for index, file_name in enumerate(matching_file_names):
             destination_name = determine_destination_name(
@@ -251,6 +260,7 @@ def download_with_paramiko():
             )
 
             print(f"Downloading file {index + 1} of {len(matching_file_names)}")
+
             try:
                 download_sftp_file(
                     client=client,
@@ -260,7 +270,14 @@ def download_with_paramiko():
             except Exception as e:
                 print(f"Failed to download {file_name} due to {e}... Skipping")
                 errors.append({"filename": file_name, "error": e})
-    else:
+                client.close()
+                time.sleep(1)
+                if key:
+                    client = get_client(host=host, port=port, username=username, key=key)
+                if password:
+                    client = get_client(host=host, port=port, username=username, password=password)
+                time.sleep(1)
+    else:  # exact match handling
         try:
             destination_name = determine_destination_name(
                 destination_folder_name=destination_folder_name,
@@ -276,11 +293,13 @@ def download_with_paramiko():
         except Exception as e:
             print(f"Failed to download {source_full_path} due to {e}")
             errors.append({"filename": source_full_path, "error": e})
+        finally:
+            client.close()
     if key_path:
         print(f"Removing temporary RSA Key file {key_path}")
         os.remove(key_path)
     if errors:
-        print(f"Failed to download {len(errors)} file(s)")
+        print(f"Failed to download {len(errors)} file(s): {errors}")
         sys.exit(EXIT_CODE_SFTP_DOWNLOAD_ERROR)
 
 
@@ -379,21 +398,6 @@ async def download_with_asycssh():
 def main():
     try:
         download_with_paramiko()
-    except paramiko.AuthenticationException as error:
-        if (
-                is_openssh_key(os.environ["SFTP_RSA_KEY_FILE"])
-                and os.environ["SFTP_RSA_KEY_FILE"] != ""
-        ):
-            print(
-                "Warning: Trouble Authenticating with RSA Key.\n"
-                "We have detected an RSA Key in the OpenSSH format. "
-                "We will now attempt to connect to the SFTP server using a different method. "
-                "To avoid this warning in the future, it is recommended to use an RSA PEM key instead."
-            )
-            asyncio.run(download_with_asycssh())
-
-        else:
-            raise error
     except Exception as error:
         print(f"Error: {error}")
         sys.exit(EXIT_CODE_SFTP_DOWNLOAD_ERROR)
